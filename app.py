@@ -21,8 +21,11 @@ hide_st_style = """
             .viewerBadge_link__1S137 {display: none !important;}
             [data-testid="stBottom"] {display: none !important;}
             .block-container {
-                padding-top: 1rem;
+                padding-top: 2.5rem;
                 padding-bottom: 0rem;
+            }
+            [data-testid="stAppViewContainer"] {
+                background-color: #111827 !important;
             }
             </style>
             """
