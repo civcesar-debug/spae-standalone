@@ -8,7 +8,7 @@ import re
 import requests
 import os
 import hashlib
-from auth import SUPABASE_URL, SUPABASE_KEY, save_project_to_db, log_revision_supabase
+from auth import SUPABASE_URL, SUPABASE_KEY, save_project_to_db, log_revision_supabase, sign_in_user
 
 st.set_page_config(page_title="Registro y Seguimiento ISC SPAE", layout="wide")
 
@@ -39,7 +39,7 @@ user_email = getattr(user, "email", "").lower()
 import json
 
 def get_local_history():
-    hist_path = "data/historial_cambios.json"
+    hist_path = r"C:\Users\cagch\Desktop\senador\upv2026\junio\historial_cambios.json"
     if not os.path.exists(hist_path): return pd.DataFrame()
     try:
         with open(hist_path, "r", encoding="utf-8") as f:
@@ -49,7 +49,7 @@ def get_local_history():
     return pd.DataFrame()
 
 def save_local_history(resumen, usuario):
-    hist_path = "data/historial_cambios.json"
+    hist_path = r"C:\Users\cagch\Desktop\senador\upv2026\junio\historial_cambios.json"
     nuevo_registro = {
         "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "Usuario": usuario,
@@ -104,7 +104,7 @@ def get_all_proyectos():
         try:
             import glob
             import os
-            versiones_dir = "Versiones_Anteriores"
+            versiones_dir = r"C:\Users\cagch\Desktop\senador\upv2026\junio\Versiones_Anteriores"
             archivos = glob.glob(os.path.join(versiones_dir, "Portafolio_SPAE_Revision_*.xlsx"))
             if archivos:
                 archivos.sort(key=os.path.getmtime, reverse=True)
@@ -112,7 +112,7 @@ def get_all_proyectos():
                 df_result = leer_portafolio_nuevo(ultimo_archivo)
         except Exception: pass
         
-    # Siempre cruzar con el directorio mÃ¡s reciente (para inyectar los contactos que hayan sido actualizados localmente)
+    # Siempre cruzar con el directorio más reciente (para inyectar los contactos que hayan sido actualizados localmente)
     if not df_result.empty:
         df_dir = leer_directorio_maestro()
         if not df_dir.empty:
@@ -123,14 +123,14 @@ def get_all_proyectos():
 
 # LECTURA DIRECTORIO MAESTRO
 def leer_directorio_maestro() -> pd.DataFrame:
-    ruta_dir = "data/Matriz_Seguimiento_Proyectos_Cesar.xlsx"
+    ruta_dir = r"C:\Users\cagch\Desktop\senador\upv2026\junio\Matriz_Seguimiento_Proyectos_Cesar.xlsx"
     if not os.path.exists(ruta_dir): return pd.DataFrame()
     try:
         df_dir = pd.read_excel(ruta_dir)
         df_dir.columns = [str(c).strip() for c in df_dir.columns]
         cols_necesarias = {}
         for c in df_dir.columns:
-            cl = str(c).lower().replace('Ã³','o').replace('Ã¡','a').replace('Ã©','e').replace('Ã­','i').replace('Ãº','u')
+            cl = str(c).lower().replace('ó','o').replace('á','a').replace('é','e').replace('í','i').replace('ú','u')
             if cl == "municipio": cols_necesarias["municipio"] = c
             elif "alcalde" in cl and "tel" in cl: cols_necesarias["telefono_alcalde"] = c
             elif "contacto" in cl or "enlace" in cl: cols_necesarias["telefono_enlace"] = c
@@ -145,8 +145,8 @@ def leer_directorio_maestro() -> pd.DataFrame:
 # 2. LECTURA Y NORMALIZACION DEL PORTAFOLIO SPAE 2026
 def leer_portafolio_nuevo(archivo) -> pd.DataFrame:
     df = pd.read_excel(archivo, header=2, engine="openpyxl")
-    # Normalizar cabeceras a minÃºsculas sin tildes para facilitar el mapeo
-    df.columns = [str(c).lower().replace('Ã³','o').replace('Ã¡','a').replace('Ã©','e').replace('Ã­','i').replace('Ãº','u').replace('Â°','').strip() for c in df.columns]
+    # Normalizar cabeceras a minúsculas sin tildes para facilitar el mapeo
+    df.columns = [str(c).lower().replace('ó','o').replace('á','a').replace('é','e').replace('í','i').replace('ú','u').replace('°','').strip() for c in df.columns]
     
     m_col = None
     for c in df.columns:
@@ -206,7 +206,7 @@ def leer_portafolio_nuevo(archivo) -> pd.DataFrame:
         "estudios y disenos"
     ]
     
-    # Renombrar estÃ¡ticamente los Ã­ndices para F-1, F-2 y F-3
+    # Renombrar estáticamente los índices para F-1, F-2 y F-3
     if len(df.columns) > 54:
         map_f1 = {df.columns[i]: ANEXOS_ISC_COLS[i-40] for i in range(40, 55)}
         df.rename(columns=map_f1, inplace=True)
@@ -222,7 +222,7 @@ def leer_portafolio_nuevo(archivo) -> pd.DataFrame:
     def calcular_pct_anexos_isc(row: pd.Series) -> float:
         tipo = str(row.get('tipo_proyecto', '')).lower() + " " + str(row.get('linea_inversion', '')).lower()
         
-        # Determinar el rango de columnas a evaluar segÃºn el tipo de proyecto
+        # Determinar el rango de columnas a evaluar según el tipo de proyecto
         if 'agro' in tipo or 'productivo' in tipo:
             cols_idx = range(55, 68)  # F-2 AGRO
         elif 'dotacion' in tipo or 'mobiliari' in tipo or 'dmec' in tipo:
@@ -395,12 +395,12 @@ def comparar_snapshot_vs_nuevo(up_dict, db_dict):
     
     if docs_subidos:
         resumen_funcional.append("**Documentos subidos a estado Recibido/Proceso:**")
-        for d in docs_subidos: resumen_funcional.append(f"  - **{d['muni']}** ({d['prof']}): se subiÃ³ *{d['doc']}*")
+        for d in docs_subidos: resumen_funcional.append(f"  - **{d['muni']}** ({d['prof']}): se subió *{d['doc']}*")
             
     if pct_avance_cambios:
         resumen_funcional.append("**Cambios en % de Avance de Anexos:**")
         for p in pct_avance_cambios:
-            signo = "subiÃ³" if p['new'] > p['old'] else "bajÃ³"
+            signo = "subió" if p['new'] > p['old'] else "bajó"
             resumen_funcional.append(f"  - **{p['muni']}** ({p['prof']}): {signo} de {p['old']}% a {p['new']}%")
             
     if obs_nuevas:
@@ -470,7 +470,7 @@ def upsert_proyectos(df_upload_parsed: pd.DataFrame, df_db: pd.DataFrame, usuari
                 revision_num=revision_num
             )
         except Exception as e_log:
-            st.warning(f"Nota: El snapshot se actualizÃ³, pero el log de revisiÃ³n fallÃ³. Â¿Aseguraste crear la tabla `spae_portafolio_revisiones`? Error: {e_log}")
+            st.warning(f"Nota: El snapshot se actualizó, pero el log de revisión falló. ¿Aseguraste crear la tabla `spae_portafolio_revisiones`? Error: {e_log}")
         
         resumen_texto = "\n".join(resumen_funcional)
         save_local_history(resumen_texto, usuario)
@@ -498,19 +498,19 @@ def obtener_faltantes_texto(row) -> str:
                 faltantes.append(col.replace("_", " ").title())
                 
     if not faltantes:
-        return "SegÃºn nuestra matriz, no hay anexos pendientes registrados."
+        return "Según nuestra matriz, no hay anexos pendientes registrados."
         
     listado = "\n".join(f"- {anexo}" for anexo in faltantes)
     
     texto = (
-        "Nos encontramos a la espera de la siguiente documentaciÃ³n faltante "
+        "Nos encontramos a la espera de la siguiente documentación faltante "
         "para avanzar con su proyecto SPAE:\n\n"
         f"{listado}\n\n"
     )
         
     texto += (
-        "Si ya enviÃ³ alguno de estos documentos, por favor reenvÃ­elos a mi correo "
-        "personal para consolidar la informaciÃ³n: civcesar2021@gmail.com.\n"
+        "Si ya envió alguno de estos documentos, por favor reenvíelos a mi correo "
+        "personal para consolidar la información: civcesar2021@gmail.com.\n"
         "Es importante que queden asociados a este proyecto y municipio."
     )
     
@@ -529,7 +529,7 @@ def whatsapp_link_cascada(row) -> tuple:
         f"Cordial saludo,\n\n"
         f"Le escribo respecto al proyecto SPAE \"{proyecto}\" en el municipio de {municipio}.\n\n"
         f"{faltantes}\n\n"
-        "Ing. Msc. Cesar Giraldo â€” Profesional SPAE."
+        "Ing. Msc. Cesar Giraldo — Profesional SPAE."
     )
 
     tel_limpio = "".join(ch for ch in str(telefono) if ch.isdigit())
@@ -551,7 +551,7 @@ def email_link(row) -> str:
     proyecto = row.get("titulo_proyecto", "")
     faltantes = obtener_faltantes_texto(row)
 
-    asunto = f"DocumentaciÃ³n pendiente proyecto SPAE â€” {municipio}"
+    asunto = f"Documentación pendiente proyecto SPAE — {municipio}"
     cuerpo = (
         f"Cordial saludo,\n\n"
         f"Le escribo respecto al proyecto SPAE \"{proyecto}\" en el municipio de {municipio}.\n\n"
@@ -568,12 +568,12 @@ def email_link(row) -> str:
 # INTERFAZ DE USUARIO
 # ==========================================
 
-st.title("Seguimiento EstratÃ©gico de Portafolio SPAE 2026")
+st.title("Seguimiento Estratégico de Portafolio SPAE 2026")
 
-versiones_dir = "Versiones_Anteriores"
+versiones_dir = r"C:\Users\cagch\Desktop\senador\upv2026\junio\Versiones_Anteriores"
 resumen_file = os.path.join(versiones_dir, "Ultimo_Resumen.txt")
 if os.path.exists(resumen_file):
-    with st.expander("Ver Ãšltimo Reporte de Cambios (HistÃ³rico)", expanded=False):
+    with st.expander("Ver Último Reporte de Cambios (Histórico)", expanded=False):
         try:
             with open(resumen_file, "r", encoding="utf-8") as f:
                 ultimo_res = f.read()
@@ -586,8 +586,8 @@ df_db = get_all_proyectos()
 
 if user_role == "admin":
     with st.expander("Subir Nuevo Portafolio / Actualizar Matriz"):
-        st.info("Carga el archivo Excel oficial. El sistema calcularÃ¡ diferencias y guardarÃ¡ la revisiÃ³n.")
-        uploaded_file = st.file_uploader("Arrastra aquÃ­ tu matriz (.xlsx)", type=["xlsx"])
+        st.info("Carga el archivo Excel oficial. El sistema calculará diferencias y guardará la revisión.")
+        uploaded_file = st.file_uploader("Arrastra aquí tu matriz (.xlsx)", type=["xlsx"])
         
         if uploaded_file:
             df_upload_parsed = leer_portafolio_nuevo(uploaded_file)
@@ -598,21 +598,21 @@ if user_role == "admin":
             
             col_diag1, col_diag2 = st.columns(2)
             with col_diag1:
-                st.markdown("**DiagnÃ³stico de Ingesta**")
+                st.markdown("**Diagnóstico de Ingesta**")
                 st.write(f"Proyectos detectados: {len(df_upload_parsed)}")
             with col_diag2:
                 st.markdown("**Cruce con Directorio CRM**")
                 if "match_type" in df_upload_parsed.columns:
                     st.dataframe(df_upload_parsed["match_type"].value_counts().reset_index(), hide_index=True)
                 
-            st.warning("Para aplicar los cambios y verlos en los tableros, haz clic en el botÃ³n de abajo:")
-            if st.button("Guardar VersiÃ³n y Analizar Cambios", type="primary", use_container_width=True):
-                with st.spinner("Comparando con el snapshot anterior y guardando revisiÃ³n..."):
+            st.warning("Para aplicar los cambios y verlos en los tableros, haz clic en el botón de abajo:")
+            if st.button("Guardar Versión y Analizar Cambios", type="primary", use_container_width=True):
+                with st.spinner("Comparando con el snapshot anterior y guardando revisión..."):
                     usuario_email = getattr(st.session_state.get("auth_user"), "email", "admin")
                     filas, resumen = upsert_proyectos(df_upload_parsed, df_db, usuario_email, uploaded_file)
                     
-                    # Guardado fÃ­sico local
-                    versiones_dir = "Versiones_Anteriores"
+                    # Guardado físico local
+                    versiones_dir = r"C:\Users\cagch\Desktop\senador\upv2026\junio\Versiones_Anteriores"
                     if not os.path.exists(versiones_dir): os.makedirs(versiones_dir)
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                     file_path = os.path.join(versiones_dir, f"Portafolio_SPAE_Revision_{timestamp}.xlsx")
@@ -621,11 +621,11 @@ if user_role == "admin":
                     except: pass
                     
                     if filas > 0:
-                        st.success("Â¡Base de datos actualizada exitosamente!")
+                        st.success("¡Base de datos actualizada exitosamente!")
                         if resumen:
                             # Guardar resumen en txt para mostrarlo en el futuro
                             try:
-                                resumen_texto = "### Ãšltimo Resumen de Cambios Funcionales:\n\n" + "\n".join([f"- {r}" for r in resumen])
+                                resumen_texto = "### Último Resumen de Cambios Funcionales:\n\n" + "\n".join([f"- {r}" for r in resumen])
                                 with open(os.path.join(versiones_dir, "Ultimo_Resumen.txt"), "w", encoding="utf-8") as f:
                                     f.write(resumen_texto)
                             except: pass
@@ -634,19 +634,19 @@ if user_role == "admin":
                             for r in resumen:
                                 st.markdown(f"- {r}")
                     else:
-                        st.warning("No se pudo guardar la versiÃ³n en la nube (posible fallo de conexiÃ³n o autenticaciÃ³n RLS), pero puedes ver los datos en los tableros de abajo en modo memoria temporal.")
+                        st.warning("No se pudo guardar la versión en la nube (posible fallo de conexión o autenticación RLS), pero puedes ver los datos en los tableros de abajo en modo memoria temporal.")
             
-            # SOBREESCRIBIR df_db CON LOS DATOS RECIÃ‰N SUBIDOS
+            # SOBREESCRIBIR df_db CON LOS DATOS RECIÉN SUBIDOS
             # Esto asegura que el dashboard siempre muestre la matriz que el usuario acaba de subir,
-            # independientemente de si la conexiÃ³n a Supabase funcionÃ³ o fallÃ³.
+            # independientemente de si la conexión a Supabase funcionó o falló.
             df_db = df_upload_parsed.copy()
 
 if df_db.empty:
     df_db = leer_directorio_maestro()
     if not df_db.empty:
-        st.success("La base de datos en la nube estÃ¡ vacÃ­a, pero he precargado tus contactos locales del Directorio Maestro.")
+        st.success("La base de datos en la nube está vacía, pero he precargado tus contactos locales del Directorio Maestro.")
     else:
-        st.warning("Tu base de datos estÃ¡ vacÃ­a. Por favor sube un archivo Excel en el panel de arriba para iniciar el ecosistema.")
+        st.warning("Tu base de datos está vacía. Por favor sube un archivo Excel en el panel de arriba para iniciar el ecosistema.")
         st.stop()
 
 df = df_db.copy()
@@ -656,24 +656,24 @@ st.divider()
 # SIDEBAR: FILTROS ROBUSTOS Y SEGURIDAD
 st.sidebar.header("Filtros de Base de Datos")
 
-# LÃ“GICA DE SEGURIDAD POR CORREO (RLS a nivel aplicaciÃ³n)
-# Si no es admin, intentamos detectar quÃ© municipios le pertenecen
+# LÓGICA DE SEGURIDAD POR CORREO (RLS a nivel aplicación)
+# Si no es admin, intentamos detectar qué municipios le pertenecen
 df_dir_filtro = leer_directorio_maestro()
 mis_muni = []
 es_alcalde_o_enlace = False
 
 if user_role != "admin" and user_email and not df_dir_filtro.empty:
     if "correos_alcaldia" in df_dir_filtro.columns:
-        # Buscar si el correo pertenece a una alcaldÃ­a
+        # Buscar si el correo pertenece a una alcaldía
         mask_alcalde = df_dir_filtro["correos_alcaldia"].astype(str).str.lower().apply(lambda x: user_email in x)
         mis_muni = df_dir_filtro[mask_alcalde]["municipio"].astype(str).str.lower().str.strip().tolist()
         if mis_muni: es_alcalde_o_enlace = True
 
-# Forzar filtro si es alcalde, o dar la opciÃ³n si es profesional/otro
-st.sidebar.markdown("### Vistas RÃ¡pidas")
+# Forzar filtro si es alcalde, o dar la opción si es profesional/otro
+st.sidebar.markdown("### Vistas Rápidas")
 if es_alcalde_o_enlace:
-    st.sidebar.success("Modo AlcaldÃ­a/Enlace Activo")
-    st.sidebar.info(f"Viendo Ãºnicamente datos de: {', '.join([m.title() for m in mis_muni])}")
+    st.sidebar.success("Modo Alcaldía/Enlace Activo")
+    st.sidebar.info(f"Viendo únicamente datos de: {', '.join([m.title() for m in mis_muni])}")
     df = df[df["municipio"].astype(str).str.lower().str.strip().isin(mis_muni)]
 else:
     ver_mis_municipios = st.sidebar.checkbox("Filtrar Mis Municipios Asignados", value=(user_role != "admin"))
@@ -720,7 +720,7 @@ df = df_filtrado
 tab_municipio, tab_grupo, tab_crm, tab_historial = st.tabs(["Dashboard por Municipio", "Dashboard por Grupo", "Directorio CRM", "Historial de Revisiones"])
 
 with tab_municipio:
-    st.markdown("## AnÃ¡lisis de Portafolio por Municipio")
+    st.markdown("## Análisis de Portafolio por Municipio")
     
     muni_opciones = sorted([str(m) for m in df["municipio"].dropna().unique() if str(m).strip()]) if "municipio" in df.columns else []
     
@@ -729,7 +729,7 @@ with tab_municipio:
         
     opciones_todas = ["-- Todos --"] + muni_opciones
     idx = opciones_todas.index(st.session_state["municipio_seleccionado"]) if st.session_state["municipio_seleccionado"] in opciones_todas else 0
-    muni_seleccionado = st.selectbox("Seleccione un Municipio para ver el anÃ¡lisis detallado:", options=opciones_todas, index=idx)
+    muni_seleccionado = st.selectbox("Seleccione un Municipio para ver el análisis detallado:", options=opciones_todas, index=idx)
     st.session_state["municipio_seleccionado"] = muni_seleccionado
     
     df_muni = df.copy()
@@ -770,10 +770,10 @@ with tab_municipio:
 
     # GENERADOR DE MENSAJES AUTOMATICOS DE WHATSAPP (COBRO DE ANEXOS)
     if muni_seleccionado != "-- Todos --":
-        with st.expander("ðŸ“² Generador AutomÃ¡tico de Recordatorios (WhatsApp)"):
+        with st.expander("📲 Generador Automático de Recordatorios (WhatsApp)"):
             st.info("Genera mensajes listos para enviar al Enlace o Alcalde con los documentos exactos que le faltan a cada proyecto.")
             
-            # Buscar telÃ©fono en directorio local
+            # Buscar teléfono en directorio local
             df_dir_local = leer_directorio_maestro()
             telefono_muni = None
             if not df_dir_local.empty and "municipio" in df_dir_local.columns:
@@ -801,15 +801,15 @@ with tab_municipio:
                     if faltantes:
                         hay_pendientes = True
                         codigo = row.get("codigo_interno", "S/N")
-                        titulo = row.get("titulo_proyecto", "Sin TÃ­tulo")
-                        mensaje = f"Cordial saludo. Desde la supervisiÃ³n SPAE revisamos el proyecto *{codigo}* en el municipio de {muni_seleccionado.title()} y notamos que faltan los siguientes documentos:\n\n- " + "\n- ".join(faltantes) + "\n\nQuedamos atentos para avanzar con la viabilidad tÃ©cnica."
+                        titulo = row.get("titulo_proyecto", "Sin Título")
+                        mensaje = f"Cordial saludo. Desde la supervisión SPAE revisamos el proyecto *{codigo}* en el municipio de {muni_seleccionado.title()} y notamos que faltan los siguientes documentos:\n\n- " + "\n- ".join(faltantes) + "\n\nQuedamos atentos para avanzar con la viabilidad técnica."
                         url_wa = f"https://wa.me/57{telefono_muni.replace(' ', '')}?text={urllib.parse.quote(mensaje)}"
-                        st.markdown(f"**Proyecto {codigo}:** {len(faltantes)} documentos faltantes. [ðŸ‘‰ Enviar Recordatorio por WhatsApp]({url_wa})")
+                        st.markdown(f"**Proyecto {codigo}:** {len(faltantes)} documentos faltantes. [👉 Enviar Recordatorio por WhatsApp]({url_wa})")
                 
                 if not hay_pendientes:
                     st.success("Todos los proyectos de este municipio tienen sus anexos completos.")
             else:
-                st.warning("No se encontrÃ³ un telÃ©fono registrado (Alcalde o Enlace) para este municipio en el Directorio.")
+                st.warning("No se encontró un teléfono registrado (Alcalde o Enlace) para este municipio en el Directorio.")
 
     st.divider()
     
@@ -821,8 +821,8 @@ with tab_municipio:
             c1.plotly_chart(fig1, use_container_width=True)
         
         if "beneficiados_victimas" in df_muni.columns and "beneficiados_vulnerables" in df_muni.columns:
-            df_pop = df_muni[["codigo_interno", "titulo_proyecto", "beneficiados_victimas", "beneficiados_vulnerables"]].melt(id_vars=["codigo_interno", "titulo_proyecto"], var_name="PoblaciÃ³n", value_name="Cantidad")
-            fig2 = px.bar(df_pop, x="codigo_interno", y="Cantidad", color="PoblaciÃ³n", title="VÃ­ctimas vs PoblaciÃ³n Vulnerable por Proyecto", barmode="stack", hover_data=["titulo_proyecto"])
+            df_pop = df_muni[["codigo_interno", "titulo_proyecto", "beneficiados_victimas", "beneficiados_vulnerables"]].melt(id_vars=["codigo_interno", "titulo_proyecto"], var_name="Población", value_name="Cantidad")
+            fig2 = px.bar(df_pop, x="codigo_interno", y="Cantidad", color="Población", title="Víctimas vs Población Vulnerable por Proyecto", barmode="stack", hover_data=["titulo_proyecto"])
             fig2.update_layout(xaxis_title="")
             c2.plotly_chart(fig2, use_container_width=True)
             
@@ -837,7 +837,7 @@ with tab_municipio:
                 df_barras["prof_ggp"] = df_muni["profesional_ggp"]
                 
             df_barras["codigo"] = df_barras["codigo_interno"].astype(str)
-            df_barras["nombre_completo"] = df_barras["titulo_proyecto"].apply(lambda x: '<br>'.join(textwrap.wrap(str(x), width=60)) if pd.notna(x) else "Sin TÃ­tulo")
+            df_barras["nombre_completo"] = df_barras["titulo_proyecto"].apply(lambda x: '<br>'.join(textwrap.wrap(str(x), width=60)) if pd.notna(x) else "Sin Título")
         
             hover_cols = ["nombre_completo", "tipo_proyecto"]
             if "prof_spae" in df_barras.columns: hover_cols.append("prof_spae")
@@ -871,7 +871,7 @@ with tab_municipio:
         st.dataframe(df_muni[cols_existentes], use_container_width=True, hide_index=True)
 
 with tab_grupo:
-    st.markdown("## AnÃ¡lisis de Portafolio por Equipo / Grupo")
+    st.markdown("## Análisis de Portafolio por Equipo / Grupo")
     grupo_seleccionado = st.radio("Seleccione el grupo a analizar:", options=["SPAE", "GGP"], horizontal=True)
     col_responsable = "profesional_spae" if grupo_seleccionado == "SPAE" else "profesional_ggp"
     
@@ -920,7 +920,7 @@ with tab_grupo:
 with tab_crm:
     st.markdown("## Directorio Global e Historial CRM")
     
-    with st.expander("â˜ï¸ Subir Directorio de Profesionales a Supabase"):
+    with st.expander("☁️ Subir Directorio de Profesionales a Supabase"):
         st.info("Carga el archivo Excel con el Directorio de Profesionales Humanitarios (00. Directorio...).")
         uploaded_directorio = st.file_uploader("Arrastra el Directorio (.xlsx)", type=["xlsx"], key="upload_dir_prof")
         if uploaded_directorio:
@@ -933,10 +933,10 @@ with tab_crm:
                     estado_str = json.dumps(df_dir_prof.to_dict(orient='records'), ensure_ascii=False)
                     user = st.session_state.get("auth_user")
                     if not user:
-                        st.error("No hay un usuario autenticado. Inicia sesiÃ³n nuevamente.")
+                        st.error("No hay un usuario autenticado. Inicia sesión nuevamente.")
                     else:
                         save_project_to_db(user, "Directorio Profesionales Humanitarios - 2026", "admin", "", "", estado_str)
-                        st.success("Â¡Directorio subido exitosamente a Supabase!")
+                        st.success("¡Directorio subido exitosamente a Supabase!")
                 except Exception as e:
                     st.error(f"Error al subir: {e}")
     with st.expander("Ver Directorio de Profesionales Humanitarios (Nube)"):
@@ -960,7 +960,7 @@ with tab_crm:
                         
                         # Asignar nombres legibles a las columnas (originalmente eran 0, 1, 2, 3, 4, 5)
                         if len(df_dir_prof.columns) == 6:
-                            df_dir_prof.columns = ["Territorial", "Nombre", "Correo", "TelÃ©fono", "Cargo", "DirecciÃ³n"]
+                            df_dir_prof.columns = ["Territorial", "Nombre", "Correo", "Teléfono", "Cargo", "Dirección"]
                         
                         import urllib.parse
                         import re
@@ -979,16 +979,16 @@ with tab_crm:
                             asunto = "Contacto desde Portafolio SPAE - Directorio de Profesionales"
                             cuerpo = (
                                 f"Cordial saludo {nombre},\n\n"
-                                "Me comunico con usted para tratar temas de articulaciÃ³n y seguimiento "
+                                "Me comunico con usted para tratar temas de articulación y seguimiento "
                                 "relacionados con los proyectos SPAE de su departamento.\n\n"
-                                "[Escriba su mensaje aquÃ­...]\n\n"
+                                "[Escriba su mensaje aquí...]\n\n"
                                 "Quedo atento(a).\n\n"
                                 "Profesional SPAE"
                             )
                             return f"https://mail.google.com/mail/?view=cm&fs=1&to={c_str}&su={urllib.parse.quote(asunto)}&body={urllib.parse.quote(cuerpo)}"
 
-                        if "TelÃ©fono" in df_dir_prof.columns:
-                            df_dir_prof["Contactar (WhatsApp)"] = df_dir_prof["TelÃ©fono"].apply(gen_wa_prof)
+                        if "Teléfono" in df_dir_prof.columns:
+                            df_dir_prof["Contactar (WhatsApp)"] = df_dir_prof["Teléfono"].apply(gen_wa_prof)
                         if "Correo" in df_dir_prof.columns and "Nombre" in df_dir_prof.columns:
                             df_dir_prof["Enviar Email (Gmail)"] = df_dir_prof.apply(lambda r: gen_email_prof(r.get("Correo"), r.get("Nombre", "")), axis=1)
                         
@@ -1020,11 +1020,11 @@ with tab_crm:
                         
                         st.dataframe(df_dir_prof, use_container_width=True, hide_index=True, column_config=col_cfg_prof)
                     else:
-                        st.info("AÃºn no has subido el Directorio de Profesionales a la nube.")
+                        st.info("Aún no has subido el Directorio de Profesionales a la nube.")
                 else:
                     st.error("Error consultando la base de datos.")
             else:
-                st.warning("Debes iniciar sesiÃ³n para ver el directorio.")
+                st.warning("Debes iniciar sesión para ver el directorio.")
         except Exception as e:
             st.error(f"Error al cargar: {e}")
             
@@ -1037,7 +1037,7 @@ with tab_crm:
             wa_links.append(link)
             wa_sources.append(source)
             tel = row.get("telefono_enlace") if pd.notna(row.get("telefono_enlace")) else row.get("telefono_alcalde")
-            info_contactos.append(str(tel) if pd.notna(tel) and str(tel).strip() not in ["", "0", "None", "nan"] else "Sin InformaciÃ³n")
+            info_contactos.append(str(tel) if pd.notna(tel) and str(tel).strip() not in ["", "0", "None", "nan"] else "Sin Información")
             
         df_display["Contactar (WhatsApp)"] = wa_links
         df_display["Fuente del Contacto"] = wa_sources
@@ -1055,15 +1055,15 @@ with tab_crm:
         with st.expander("Agregar / Actualizar Contacto en Directorio Maestro", expanded=False):
             col1, col2 = st.columns(2)
             with col1:
-                nuevo_muni = st.text_input("Municipio del contacto (ej. SipÃ­)")
-                nuevo_enlace = st.text_input("Nombre y TelÃ©fono del Enlace (ej. Juan Perez 3001234567)")
+                nuevo_muni = st.text_input("Municipio del contacto (ej. Sipí)")
+                nuevo_enlace = st.text_input("Nombre y Teléfono del Enlace (ej. Juan Perez 3001234567)")
             with col2:
-                nuevo_alcalde = st.text_input("Nombre y TelÃ©fono del Alcalde (Opcional)")
-                nuevo_correo = st.text_input("Correo de AlcaldÃ­a (Opcional)")
+                nuevo_alcalde = st.text_input("Nombre y Teléfono del Alcalde (Opcional)")
+                nuevo_correo = st.text_input("Correo de Alcaldía (Opcional)")
             
             if st.button("Guardar Contacto en Excel", use_container_width=True):
                 if nuevo_muni.strip():
-                    ruta_excel = "data/Matriz_Seguimiento_Proyectos_Cesar.xlsx"
+                    ruta_excel = r"C:\Users\cagch\Desktop\senador\upv2026\junio\Matriz_Seguimiento_Proyectos_Cesar.xlsx"
                     try:
                         import pandas as pd
                         df_update = pd.read_excel(ruta_excel)
@@ -1074,15 +1074,15 @@ with tab_crm:
                                 idx_match = idx
                                 break
                         if idx_match is not None:
-                            if nuevo_enlace: df_update.at[idx_match, "TelÃ©fono Enlace"] = nuevo_enlace
-                            if nuevo_alcalde: df_update.at[idx_match, "TelÃ©fono AlcaldÃ­a"] = nuevo_alcalde
-                            if nuevo_correo: df_update.at[idx_match, "Correos AlcaldÃ­a"] = nuevo_correo
+                            if nuevo_enlace: df_update.at[idx_match, "Teléfono Enlace"] = nuevo_enlace
+                            if nuevo_alcalde: df_update.at[idx_match, "Teléfono Alcaldía"] = nuevo_alcalde
+                            if nuevo_correo: df_update.at[idx_match, "Correos Alcaldía"] = nuevo_correo
                             st.success(f"Contacto actualizado para {nuevo_muni}. Recargando...")
                         else:
                             nueva_fila = {"Municipio": nuevo_muni.strip()}
-                            if nuevo_enlace: nueva_fila["TelÃ©fono Enlace"] = nuevo_enlace
-                            if nuevo_alcalde: nueva_fila["TelÃ©fono AlcaldÃ­a"] = nuevo_alcalde
-                            if nuevo_correo: nueva_fila["Correos AlcaldÃ­a"] = nuevo_correo
+                            if nuevo_enlace: nueva_fila["Teléfono Enlace"] = nuevo_enlace
+                            if nuevo_alcalde: nueva_fila["Teléfono Alcaldía"] = nuevo_alcalde
+                            if nuevo_correo: nueva_fila["Correos Alcaldía"] = nuevo_correo
                             df_update = pd.concat([df_update, pd.DataFrame([nueva_fila])], ignore_index=True)
                             st.success(f"Nuevo municipio {nuevo_muni} agregado al directorio. Recargando...")
                         df_update.to_excel(ruta_excel, index=False)
@@ -1115,5 +1115,4 @@ with tab_historial:
     if not df_hist.empty:
         st.dataframe(df_hist, hide_index=True, use_container_width=True)
     else:
-        st.info("No hay historial local previo. A partir de hoy se registrarÃ¡n aquÃ­ los cambios que subas.")
-
+        st.info("No hay historial local previo. A partir de hoy se registrarán aquí los cambios que subas.")
