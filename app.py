@@ -12,6 +12,19 @@ from auth import SUPABASE_URL, SUPABASE_KEY, save_project_to_db, log_revision_su
 
 st.set_page_config(page_title="Registro y Seguimiento ISC SPAE", layout="wide")
 
+hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            .block-container {
+                padding-top: 1rem;
+                padding-bottom: 0rem;
+            }
+            </style>
+            """
+st.markdown(hide_st_style, unsafe_allow_html=True)
+
 # PROTECCION DE AUTENTICACION Y ROLES
 user = st.session_state.get("auth_user")
 if not user:
