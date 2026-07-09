@@ -17,6 +17,9 @@ hide_st_style = """
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
             header {visibility: hidden;}
+            .viewerBadge_container__1JCIV {display: none !important;}
+            .viewerBadge_link__1S137 {display: none !important;}
+            [data-testid="stBottom"] {display: none !important;}
             .block-container {
                 padding-top: 1rem;
                 padding-bottom: 0rem;
