@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -15,8 +15,21 @@ st.set_page_config(page_title="Registro y Seguimiento ISC SPAE", layout="wide")
 # PROTECCION DE AUTENTICACION Y ROLES
 user = st.session_state.get("auth_user")
 if not user:
-    st.error("Acceso denegado. Debes iniciar sesiÃ³n para ver este tablero.")
-    st.info("Por favor inicia sesiÃ³n en la pÃ¡gina de inicio.")
+    st.title("Inicio de Sesión - SPAE Standalone")
+    with st.form("login_form"):
+        email = st.text_input("Correo electrónico")
+        password = st.text_input("Contraseña", type="password")
+        submitted = st.form_submit_button("Entrar")
+        if submitted:
+            try:
+                from auth import sign_in_user
+                resp = sign_in_user(email, password)
+                if resp and getattr(resp, 'user', None):
+                    st.session_state["auth_user"] = resp.user
+                    st.session_state["user_role"] = resp.user.role
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Error al iniciar sesión: {e}")
     st.stop()
 
 user_role = st.session_state.get("user_role", "free")
