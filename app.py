@@ -172,25 +172,14 @@ hide_st_style = """
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-# PROTECCION DE AUTENTICACION Y ROLES
+# PROTECCION DE AUTENTICACION Y ROLES - AUTO-LOGIN ACTIVO
 user = st.session_state.get("auth_user")
 if not user:
-    st.title("Inicio de Sesión - SPAE Standalone")
-    with st.form("login_form"):
-        email = st.text_input("Correo electrónico")
-        password = st.text_input("Contraseña", type="password")
-        submitted = st.form_submit_button("Entrar")
-        if submitted:
-            try:
-                from auth import sign_in_user
-                resp = sign_in_user(email, password)
-                if resp and getattr(resp, 'user', None):
-                    st.session_state["auth_user"] = resp.user
-                    st.session_state["user_role"] = resp.user.role
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Error al iniciar sesión: {e}")
-    st.stop()
+    from auth import DummyUser
+    user = DummyUser(email="cesar.giraldo@unidadvictimas.gov.co", role="admin")
+    st.session_state["auth_user"] = user
+    st.session_state["user_role"] = "admin"
+
 
 user_role = st.session_state.get("user_role", "free")
 user_email = getattr(user, "email", "").lower()
