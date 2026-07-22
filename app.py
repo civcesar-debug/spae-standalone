@@ -48,7 +48,14 @@ def generar_documento_word_informe(df_informe, titulo_informe="Informe de Seguim
 
     doc.add_paragraph()
 
-    # Table
+    # SECTION 1: PROJ SUMMARY
+    h1 = doc.add_heading(level=1)
+    r1 = h1.add_run("1. Consolidador de Estado y Avance de Proyectos")
+    r1.font.name = 'Antipasto'
+    r1.font.size = Pt(14)
+    r1.font.bold = True
+    r1.font.color.rgb = RGBColor(0x00, 0x33, 0x66)
+
     table = doc.add_table(rows=1, cols=6)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
@@ -87,10 +94,57 @@ def generar_documento_word_informe(df_informe, titulo_informe="Informe de Seguim
             r.font.name = 'Antipasto'
             r.font.size = Pt(9)
 
+    doc.add_paragraph()
+
+    # SECTION 2: DIRECTORY TABLE
+    h2 = doc.add_heading(level=1)
+    r2 = h2.add_run("2. Directorio Institucional de Contactos Municipales")
+    r2.font.name = 'Antipasto'
+    r2.font.size = Pt(14)
+    r2.font.bold = True
+    r2.font.color.rgb = RGBColor(0x00, 0x33, 0x66)
+
+    dir_table = doc.add_table(rows=1, cols=5)
+    dir_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    dir_hdr = dir_table.rows[0].cells
+    d_cols = ["Municipio", "Alcalde(sa)", "Secretaria / Enlace", "Correo Electronico", "Telefono"]
+    for i, col_name in enumerate(d_cols):
+        cell = dir_hdr[i]
+        shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="003366"/>')
+        cell._tc.get_or_add_tcPr().append(shd)
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run(col_name)
+        r.font.name = 'Antipasto'
+        r.font.size = Pt(10)
+        r.font.bold = True
+        r.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+    for _, row in df_informe.iterrows():
+        row_cells = dir_table.add_row().cells
+        vals = [
+            str(row.get("MUNICIPIO", "")),
+            str(row.get("Nombre Alcalde", "No Registrado")),
+            str(row.get("Nombre Enlace Contacto", "Secretaria de Planeacion")),
+            str(row.get("Correos Alcaldia", "No Registrado")),
+            str(row.get("Telefono Alcaldia", "No Registrado"))
+        ]
+        for i, val in enumerate(vals):
+            cell = row_cells[i]
+            p = cell.paragraphs[0]
+            if i in [0]:
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            else:
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            r = p.add_run(val)
+            r.font.name = 'Antipasto'
+            r.font.size = Pt(8.5)
+
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer.getvalue()
+
 
 import hashlib
 from auth import SUPABASE_URL, SUPABASE_KEY, save_project_to_db, log_revision_supabase, sign_in_user
