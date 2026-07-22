@@ -1,3 +1,6 @@
+
+
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -7,6 +10,88 @@ import urllib.parse
 import re
 import requests
 import os
+
+# ==============================================================================
+# MODULO DE GENERACION DE INFORMES EN WORD (ANTIPASTO - ZERO EMOJIS)
+# ==============================================================================
+def generar_documento_word_informe(df_informe, titulo_informe="Informe de Seguimiento Proyectos SPAE"):
+    import docx
+    from docx import Document
+    from docx.shared import Inches, Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
+    import io
+
+    doc = Document()
+    for s in doc.sections:
+        s.top_margin = Inches(1)
+        s.bottom_margin = Inches(1)
+        s.left_margin = Inches(1)
+        s.right_margin = Inches(1)
+
+    p_t = doc.add_paragraph()
+    p_t.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_t = p_t.add_run(titulo_informe.upper())
+    r_t.font.name = 'Antipasto'
+    r_t.font.size = Pt(20)
+    r_t.font.bold = True
+    r_t.font.color.rgb = RGBColor(0x00, 0x33, 0x66)
+
+    p_sub = doc.add_paragraph()
+    p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r_sub = p_sub.add_run("SUBDIRECCION DE PREVENCION Y ATENCION DE EMERGENCIAS - SPAE 2026")
+    r_sub.font.name = 'Antipasto'
+    r_sub.font.size = Pt(12)
+    r_sub.font.color.rgb = RGBColor(0x00, 0x66, 0x99)
+
+    doc.add_paragraph()
+
+    # Table
+    table = doc.add_table(rows=1, cols=6)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+    hdr_cells = table.rows[0].cells
+    cols = ["Codigo", "Municipio", "Linea", "Estado", "Responsable", "Avance %"]
+    for i, col_name in enumerate(cols):
+        cell = hdr_cells[i]
+        shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="003366"/>')
+        cell._tc.get_or_add_tcPr().append(shd)
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run(col_name)
+        r.font.name = 'Antipasto'
+        r.font.size = Pt(10)
+        r.font.bold = True
+        r.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+    for _, row in df_informe.iterrows():
+        row_cells = table.add_row().cells
+        vals = [
+            str(row.get("Consecutivo Interno", row.get("CODIGO SIGESPLAN", ""))),
+            str(row.get("MUNICIPIO", "")),
+            str(row.get("LINEA INVERSION", row.get("TIPO DE PROYECTO", ""))),
+            str(row.get("ESTADO", "")),
+            str(row.get("Profesional SPAE", "")),
+            f"{row.get('% Avance TOTAL', row.get('AVANCE', 0))}%"
+        ]
+        for i, val in enumerate(vals):
+            cell = row_cells[i]
+            p = cell.paragraphs[0]
+            if i in [0, 5]:
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            else:
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            r = p.add_run(val)
+            r.font.name = 'Antipasto'
+            r.font.size = Pt(9)
+
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
+
 import hashlib
 from auth import SUPABASE_URL, SUPABASE_KEY, save_project_to_db, log_revision_supabase, sign_in_user
 
@@ -789,7 +874,7 @@ with tab_municipio:
 
     # GENERADOR DE MENSAJES AUTOMATICOS DE WHATSAPP (COBRO DE ANEXOS)
     if muni_seleccionado != "-- Todos --":
-        with st.expander("📲 Generador Automático de Recordatorios (WhatsApp)"):
+        with st.expander(" Generador Automático de Recordatorios (WhatsApp)"):
             st.info("Genera mensajes listos para enviar al Enlace o Alcalde con los documentos exactos que le faltan a cada proyecto.")
             
             # Buscar teléfono en directorio local
@@ -823,7 +908,7 @@ with tab_municipio:
                         titulo = row.get("titulo_proyecto", "Sin Título")
                         mensaje = f"Cordial saludo. Desde la supervisión SPAE revisamos el proyecto *{codigo}* en el municipio de {muni_seleccionado.title()} y notamos que faltan los siguientes documentos:\n\n- " + "\n- ".join(faltantes) + "\n\nQuedamos atentos para avanzar con la viabilidad técnica."
                         url_wa = f"https://wa.me/57{telefono_muni.replace(' ', '')}?text={urllib.parse.quote(mensaje)}"
-                        st.markdown(f"**Proyecto {codigo}:** {len(faltantes)} documentos faltantes. [👉 Enviar Recordatorio por WhatsApp]({url_wa})")
+                        st.markdown(f"**Proyecto {codigo}:** {len(faltantes)} documentos faltantes. [ Enviar Recordatorio por WhatsApp]({url_wa})")
                 
                 if not hay_pendientes:
                     st.success("Todos los proyectos de este municipio tienen sus anexos completos.")
@@ -939,7 +1024,7 @@ with tab_grupo:
 with tab_crm:
     st.markdown("## Directorio Global e Historial CRM")
     
-    with st.expander("☁️ Subir Directorio de Profesionales a Supabase"):
+    with st.expander(" Subir Directorio de Profesionales a Supabase"):
         st.info("Carga el archivo Excel con el Directorio de Profesionales Humanitarios (00. Directorio...).")
         uploaded_directorio = st.file_uploader("Arrastra el Directorio (.xlsx)", type=["xlsx"], key="upload_dir_prof")
         if uploaded_directorio:
@@ -1135,3 +1220,39 @@ with tab_historial:
         st.dataframe(df_hist, hide_index=True, use_container_width=True)
     else:
         st.info("No hay historial local previo. A partir de hoy se registrarán aquí los cambios que subas.")
+
+
+# ------------------------------------------------------------------------------
+# PANEL DE GENERACION Y DESCARGA DE INFORMES EN WORD
+# ------------------------------------------------------------------------------
+st.sidebar.markdown("---")
+st.sidebar.subheader("Modulo de Informes y Descargas")
+
+if st.sidebar.button("Generar Informe General del Portafolio"):
+    try:
+        df_gen = pd.read_excel(r"C:\Users\cagch\Desktop\SPAE_Aislada\data\Matriz_Seguimiento_Proyectos_Cesar.xlsx")
+        docx_bytes = generar_documento_word_informe(df_gen, "Informe General de Seguimiento Portafolio SPAE 2026")
+        st.sidebar.download_button(
+            label="Descargar Informe General (Word)",
+            data=docx_bytes,
+            file_name="Informe_General_Portafolio_SPAE_2026.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    except Exception as e_err:
+        st.sidebar.error(f"Error generando informe: {e_err}")
+
+if st.sidebar.button("Generar Informe Mis Proyectos (Cesar Giraldo)"):
+    try:
+        df_all = pd.read_excel(r"C:\Users\cagch\Desktop\SPAE_Aislada\data\Matriz_Seguimiento_Proyectos_Cesar.xlsx")
+        df_cesar = df_all[df_all["Profesional SPAE"].astype(str).str.contains("Cesar", case=False, na=False)]
+        docx_bytes_c = generar_documento_word_informe(df_cesar, "Informe de Gestion - Ing. Cesar Giraldo Chaparro (11 Municipios)")
+        st.sidebar.download_button(
+            label="Descargar Informe Mis Proyectos (Word)",
+            data=docx_bytes_c,
+            file_name="Informe_Mis_Proyectos_Cesar_Giraldo_11_Municipios.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    except Exception as e_err:
+        st.sidebar.error(f"Error generando informe: {e_err}")
+
+st.sidebar.markdown("---")
