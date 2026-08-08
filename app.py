@@ -293,7 +293,7 @@ def leer_directorio_maestro() -> pd.DataFrame:
 
 # 2. LECTURA Y NORMALIZACION DEL PORTAFOLIO SPAE 2026
 def leer_portafolio_nuevo(archivo) -> pd.DataFrame:
-    df = pd.read_excel(archivo, header=2, engine="openpyxl")
+    df = pd.read_excel(archivo, sheet_name="Registro Avance x Responsables", header=3, engine="openpyxl")
     # Normalizar cabeceras a minúsculas sin tildes para facilitar el mapeo
     df.columns = [str(c).lower().replace('ó','o').replace('á','a').replace('é','e').replace('í','i').replace('ú','u').replace('°','').strip() for c in df.columns]
     
