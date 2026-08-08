@@ -377,7 +377,7 @@ def leer_portafolio_nuevo(archivo) -> pd.DataFrame:
         elif 'dotacion' in tipo or 'mobiliari' in tipo or 'dmec' in tipo:
             cols_idx = range(68, 74)  # F-3 DMEC
         else: 
-            cols_idx = range(40, 55)  # F-1 ISC (por defecto)
+            cols_idx = range(30, 55)  # F-1 ISC (por defecto)
             
         estados = []
         for idx in cols_idx:
@@ -979,13 +979,13 @@ with tab_municipio:
         
         if "pct_anexos_isc" in df_muni.columns and len(df_muni) > 0:
             import textwrap
-            df_barras = df_muni[["codigo_interno", "titulo_proyecto", "pct_anexos_isc", "tipo_proyecto"]].copy()
+            df_barras = df_muni[["codigo_interno", "titulo_proyecto", "pct_anexos_isc", "tipo_proyecto", "municipio"]].copy()
             if "profesional_spae" in df_muni.columns:
                 df_barras["prof_spae"] = df_muni["profesional_spae"]
             if "profesional_ggp" in df_muni.columns:
                 df_barras["prof_ggp"] = df_muni["profesional_ggp"]
                 
-            df_barras["codigo"] = df_barras["codigo_interno"].astype(str)
+            df_barras["codigo"] = df_barras["codigo_interno"].astype(str) + " - " + df_barras["municipio"].astype(str)
             df_barras["nombre_completo"] = df_barras["titulo_proyecto"].apply(lambda x: '<br>'.join(textwrap.wrap(str(x), width=60)) if pd.notna(x) else "Sin Título")
         
             hover_cols = ["nombre_completo", "tipo_proyecto"]
