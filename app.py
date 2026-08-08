@@ -333,6 +333,9 @@ def leer_portafolio_nuevo(archivo) -> pd.DataFrame:
     for v in rename_map.values():
         if v not in df.columns: df[v] = None
 
+    # Eliminar columnas duplicadas para evitar errores de Pandas (ej. DataFrame en vez de Series)
+    df = df.loc[:, ~df.columns.duplicated()].copy()
+
     for num_col in ["presupuesto_proyectado", "presupuesto_solicitado", "diferencia_presupuesto", 
                     "total_beneficiados", "beneficiados_victimas", "beneficiados_vulnerables"]:
         df[num_col] = pd.to_numeric(df[num_col], errors="coerce").fillna(0)
