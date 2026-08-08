@@ -785,6 +785,16 @@ if user_role == "admin":
                     else:
                         st.warning("No se pudo guardar la versión en la nube (posible fallo de conexión o autenticación RLS), pero puedes ver los datos en los tableros de abajo en modo memoria temporal.")
             
+            # Calcular crecimiento antes de sobreescribir df_db
+            if not df_db.empty and "codigo_interno" in df_db.columns and "codigo_interno" in df_upload_parsed.columns:
+                old_pcts = df_db.set_index("codigo_interno")["pct_anexos_isc"].to_dict()
+                df_upload_parsed["pct_crecimiento"] = df_upload_parsed.apply(
+                    lambda r: float(r.get("pct_anexos_isc", 0)) - float(old_pcts.get(r.get("codigo_interno"), r.get("pct_anexos_isc", 0))),
+                    axis=1
+                )
+            else:
+                df_upload_parsed["pct_crecimiento"] = 0.0
+                
             # SOBREESCRIBIR df_db CON LOS DATOS RECIÉN SUBIDOS
             # Esto asegura que el dashboard siempre muestre la matriz que el usuario acaba de subir,
             # independientemente de si la conexión a Supabase funcionó o falló.
@@ -985,24 +995,36 @@ with tab_municipio:
             if "profesional_ggp" in df_muni.columns:
                 df_barras["prof_ggp"] = df_muni["profesional_ggp"]
                 
+            if "pct_crecimiento" in df_muni.columns:
+                df_barras["pct_crecimiento"] = df_muni["pct_crecimiento"]
+            else:
+                df_barras["pct_crecimiento"] = 0.0
+                
             df_barras["codigo"] = df_barras["codigo_interno"].astype(str) + " - " + df_barras["municipio"].astype(str)
             df_barras["nombre_completo"] = df_barras["titulo_proyecto"].apply(lambda x: '<br>'.join(textwrap.wrap(str(x), width=60)) if pd.notna(x) else "Sin Título")
+            
+            df_barras["texto_avance"] = df_barras.apply(
+                lambda r: f"{r['pct_anexos_isc']:.0f}%" + (f" (+{r['pct_crecimiento']:.0f}%)" if r.get("pct_crecimiento", 0) > 0 else ""), axis=1
+            )
         
             hover_cols = ["nombre_completo", "tipo_proyecto"]
             if "prof_spae" in df_barras.columns: hover_cols.append("prof_spae")
             if "prof_ggp" in df_barras.columns: hover_cols.append("prof_ggp")
+            if "pct_crecimiento" in df_barras.columns: hover_cols.append("pct_crecimiento")
 
             fig = px.bar(
                 df_barras,
                 x="codigo",
                 y="pct_anexos_isc",
+                text="texto_avance",
                 title=f"Avance documental ISC/DMEC/AGRO por proyecto - {muni_seleccionado}",
-                labels={"codigo": "Proyecto", "pct_anexos_isc": "% anexos recibidos", "nombre_completo": "Proyecto"},
+                labels={"codigo": "Proyecto", "pct_anexos_isc": "% anexos recibidos", "nombre_completo": "Proyecto", "pct_crecimiento": "Crecimiento (%)"},
                 color="pct_anexos_isc",
                 color_continuous_scale=["#d32f2f", "#ffb300", "#4caf50"],
-                range_y=[0, 100],
+                range_y=[0, 110],
                 hover_data=hover_cols
             )
+            fig.update_traces(textposition='outside')
             fig.update_layout(xaxis_tickangle=-45)
             st.plotly_chart(fig, use_container_width=True)
         else:
