@@ -148,8 +148,8 @@ def refresh_session(user) -> bool:
 def get_valid_token(user) -> str | None:
     return getattr(user, "access_token", "local_token")
 
-def save_project_to_db(project_data):
+def save_project_to_db(*args, **kwargs):
     return True
 
-def log_revision_supabase(rev_data):
+def log_revision_supabase(*args, **kwargs):
     return True
