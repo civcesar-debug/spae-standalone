@@ -333,9 +333,6 @@ def leer_portafolio_nuevo(archivo) -> pd.DataFrame:
     for v in rename_map.values():
         if v not in df.columns: df[v] = None
 
-    # Eliminar columnas duplicadas para evitar errores de Pandas (ej. DataFrame en vez de Series)
-    df = df.loc[:, ~df.columns.duplicated()].copy()
-
     for num_col in ["presupuesto_proyectado", "presupuesto_solicitado", "diferencia_presupuesto", 
                     "total_beneficiados", "beneficiados_victimas", "beneficiados_vulnerables"]:
         df[num_col] = pd.to_numeric(df[num_col], errors="coerce").fillna(0)
@@ -358,16 +355,16 @@ def leer_portafolio_nuevo(archivo) -> pd.DataFrame:
         "estudios y disenos"
     ]
     
-    # Renombrar estáticamente los índices para F-1, F-2 y F-3
-    if len(df.columns) > 54:
-        map_f1 = {df.columns[i]: ANEXOS_ISC_COLS[i-40] for i in range(40, 55)}
-        df.rename(columns=map_f1, inplace=True)
+    # Renombrar estáticamente los índices para F-2 y F-3
     if len(df.columns) > 67:
         map_f2 = {df.columns[i]: f"anexo_agro_{i-55}" for i in range(55, 68)}
         df.rename(columns=map_f2, inplace=True)
     if len(df.columns) > 73:
         map_f3 = {df.columns[i]: f"anexo_dmec_{i-68}" for i in range(68, 74)}
         df.rename(columns=map_f3, inplace=True)
+        
+    # Eliminar columnas duplicadas DESPUÉS de todo el renombrado
+    df = df.loc[:, ~df.columns.duplicated()].copy()
     
     ESTADOS_VALIDOS = {"recibido", "no recibido", "en ajustes", "en proceso"}
 
