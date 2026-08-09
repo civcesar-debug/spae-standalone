@@ -674,11 +674,15 @@ def whatsapp_link_cascada(row) -> tuple:
     proyecto = row.get("titulo_proyecto", "")
     faltantes = obtener_faltantes_texto(row)
 
+    user = st.session_state.get("auth_user")
+    nombre_usuario = getattr(user, "email", "Cesar Giraldo").split('@')[0].replace('.', ' ').title() if user else "Cesar Giraldo"
+    if "Cesar Giraldo" in nombre_usuario: nombre_usuario = "Ing. Msc. Cesar Giraldo"
+
     mensaje = (
         f"Cordial saludo,\n\n"
         f"Le escribo respecto al proyecto SPAE \"{proyecto}\" en el municipio de {municipio}.\n\n"
         f"{faltantes}\n\n"
-        "Ing. Msc. Cesar Giraldo — Profesional SPAE."
+        f"{nombre_usuario} — Profesional SPAE."
     )
 
     tel_limpio = "".join(ch for ch in str(telefono) if ch.isdigit())
@@ -700,13 +704,17 @@ def email_link(row) -> str:
     proyecto = row.get("titulo_proyecto", "")
     faltantes = obtener_faltantes_texto(row)
 
+    user = st.session_state.get("auth_user")
+    nombre_usuario = getattr(user, "email", "Cesar Giraldo").split('@')[0].replace('.', ' ').title() if user else "Cesar Giraldo"
+    if "Cesar Giraldo" in nombre_usuario: nombre_usuario = "Ing. Msc. Cesar Giraldo"
+
     asunto = f"Documentación pendiente proyecto SPAE — {municipio}"
     cuerpo = (
         f"Cordial saludo,\n\n"
         f"Le escribo respecto al proyecto SPAE \"{proyecto}\" en el municipio de {municipio}.\n\n"
         f"{faltantes}\n\n"
         "Quedo atento.\n\n"
-        "Ing. Msc. Cesar Giraldo\n"
+        f"{nombre_usuario}\n"
         "Profesional SPAE"
     )
 
@@ -948,22 +956,25 @@ with tab_municipio:
                 import urllib.parse
                 hay_pendientes = False
                 for _, row in df_muni.iterrows():
-                    faltantes = []
-                    for col in df_muni.columns:
-                        if "anexo" in col.lower() or "cert" in col.lower() or "doc_" in col.lower():
-                            if col == "pct_anexos_isc": continue
-                            val = str(row[col]).strip().upper()
-                            if val in ["NO", "", "NAN", "NONE", "PENDIENTE"]:
-                                nombre_doc = col.replace("_", " ").title()
-                                faltantes.append(nombre_doc)
+                    faltantes_str = obtener_faltantes_texto(row)
                     
-                    if faltantes:
+                    if "no hay anexos pendientes" not in faltantes_str:
                         hay_pendientes = True
                         codigo = row.get("codigo_interno", "S/N")
                         titulo = row.get("titulo_proyecto", "Sin Título")
-                        mensaje = f"Cordial saludo. Desde la supervisión SPAE revisamos el proyecto *{codigo}* en el municipio de {muni_seleccionado.title()} y notamos que faltan los siguientes documentos:\n\n- " + "\n- ".join(faltantes) + "\n\nQuedamos atentos para avanzar con la viabilidad técnica."
+                        
+                        user = st.session_state.get("auth_user")
+                        nombre_usuario = getattr(user, "email", "Cesar Giraldo").split('@')[0].replace('.', ' ').title() if user else "Cesar Giraldo"
+                        if "Cesar Giraldo" in nombre_usuario: nombre_usuario = "Ing. Msc. Cesar Giraldo"
+                        
+                        mensaje = (
+                            f"Cordial saludo,\n\n"
+                            f"Le escribo respecto al proyecto SPAE \"{titulo}\" en el municipio de {muni_seleccionado.title()}.\n\n"
+                            f"{faltantes_str}\n\n"
+                            f"{nombre_usuario} — Profesional SPAE."
+                        )
                         url_wa = f"https://wa.me/57{telefono_muni.replace(' ', '')}?text={urllib.parse.quote(mensaje)}"
-                        st.markdown(f"**Proyecto {codigo}:** {len(faltantes)} documentos faltantes. [ Enviar Recordatorio por WhatsApp]({url_wa})")
+                        st.markdown(f"**Proyecto {codigo}:** Documentos pendientes detectados. [📲 Enviar Recordatorio por WhatsApp]({url_wa})")
                 
                 if not hay_pendientes:
                     st.success("Todos los proyectos de este municipio tienen sus anexos completos.")
@@ -1119,81 +1130,89 @@ with tab_crm:
                 import json
                 import pandas as pd
                 
-                url = f"{SUPABASE_URL}/rest/v1/proyectos?nombre_proyecto=eq.Directorio Profesionales Humanitarios - 2026&select=estado_json&order=created_at.desc&limit=1"
-                headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {getattr(user, 'access_token', SUPABASE_KEY)}"}
-                res = requests.get(url, headers=headers)
-                if res.status_code == 200:
-                    data = res.json()
-                    if data and len(data) > 0:
-                        estado = data[0].get("estado_json", "[]")
-                        if isinstance(estado, str): estado = json.loads(estado)
-                        df_dir_prof = pd.DataFrame(estado)
-                        
-                        # Asignar nombres legibles a las columnas (originalmente eran 0, 1, 2, 3, 4, 5)
-                        if len(df_dir_prof.columns) == 6:
-                            df_dir_prof.columns = ["Territorial", "Nombre", "Correo", "Teléfono", "Cargo", "Dirección"]
-                        
-                        import urllib.parse
-                        import re
-                        
-                        def gen_wa_prof(tel):
-                            tel_str = str(tel).strip()
-                            if not tel_str or tel_str in ["", "nan", "None"]: return None
-                            digits = re.sub(r'\D', '', tel_str)
-                            if not digits: return None
-                            if not digits.startswith("57"): digits = "57" + digits
-                            return f"https://wa.me/{digits}"
-                            
-                        def gen_email_prof(correo, nombre):
-                            c_str = str(correo).strip()
-                            if "@" not in c_str: return None
-                            asunto = "Contacto desde Portafolio SPAE - Directorio de Profesionales"
-                            cuerpo = (
-                                f"Cordial saludo {nombre},\n\n"
-                                "Me comunico con usted para tratar temas de articulación y seguimiento "
-                                "relacionados con los proyectos SPAE de su departamento.\n\n"
-                                "[Escriba su mensaje aquí...]\n\n"
-                                "Quedo atento(a).\n\n"
-                                "Profesional SPAE"
-                            )
-                            return f"https://mail.google.com/mail/?view=cm&fs=1&to={c_str}&su={urllib.parse.quote(asunto)}&body={urllib.parse.quote(cuerpo)}"
-
-                        if "Teléfono" in df_dir_prof.columns:
-                            df_dir_prof["Contactar (WhatsApp)"] = df_dir_prof["Teléfono"].apply(gen_wa_prof)
-                        if "Correo" in df_dir_prof.columns and "Nombre" in df_dir_prof.columns:
-                            df_dir_prof["Enviar Email (Gmail)"] = df_dir_prof.apply(lambda r: gen_email_prof(r.get("Correo"), r.get("Nombre", "")), axis=1)
-                        
-                        col_cfg_prof = {
-                            "Contactar (WhatsApp)": st.column_config.LinkColumn("Contactar (WhatsApp)", display_text="Abrir Chat WA"),
-                            "Enviar Email (Gmail)": st.column_config.LinkColumn("Enviar Email (Gmail)", display_text="Abrir Gmail")
-                        }
-                        
-                        # Filtrar por los departamentos asignados al usuario / municipio seleccionado
-                        import unicodedata
-                        def normalize_text(text):
-                            if not isinstance(text, str): return ""
-                            return unicodedata.normalize('NFD', text).encode('ascii', 'ignore').decode('utf-8').lower().strip()
-                        
-                        try:
-                            if not df_muni.empty and "departamento" in df_muni.columns:
-                                deptos_muni = [normalize_text(d) for d in df_muni["departamento"].dropna().unique()]
-                                if deptos_muni:
-                                    def match_depto(territorial_val):
-                                        t_norm = normalize_text(territorial_val)
-                                        for d in deptos_muni:
-                                            if d in t_norm: return True
-                                        return False
-                                    df_dir_prof = df_dir_prof[df_dir_prof["Territorial"].apply(match_depto)]
-                                    if df_dir_prof.empty:
-                                        st.warning("No se encontraron profesionales en el directorio para tus departamentos asignados.")
-                        except Exception as e:
-                            pass # Fallback a mostrar todos si hay error en el filtrado
-                        
-                        st.dataframe(df_dir_prof, use_container_width=True, hide_index=True, column_config=col_cfg_prof)
+                if not SUPABASE_URL or not SUPABASE_URL.startswith("http"):
+                    st.info("La conexión a la nube está deshabilitada (Modo Local). Mostrando el Directorio Local Maestro.")
+                    df_dir_local = leer_directorio_maestro()
+                    if not df_dir_local.empty:
+                        st.dataframe(df_dir_local, use_container_width=True, hide_index=True)
                     else:
-                        st.info("Aún no has subido el Directorio de Profesionales a la nube.")
+                        st.warning("No se encontró el archivo del directorio maestro local.")
                 else:
-                    st.error("Error consultando la base de datos.")
+                    url = f"{SUPABASE_URL}/rest/v1/proyectos?nombre_proyecto=eq.Directorio Profesionales Humanitarios - 2026&select=estado_json&order=created_at.desc&limit=1"
+                    headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {getattr(user, 'access_token', SUPABASE_KEY)}"}
+                    res = requests.get(url, headers=headers)
+                    if res.status_code == 200:
+                        data = res.json()
+                        if data and len(data) > 0:
+                            estado = data[0].get("estado_json", "[]")
+                            if isinstance(estado, str): estado = json.loads(estado)
+                            df_dir_prof = pd.DataFrame(estado)
+                            
+                            # Asignar nombres legibles a las columnas (originalmente eran 0, 1, 2, 3, 4, 5)
+                            if len(df_dir_prof.columns) == 6:
+                                df_dir_prof.columns = ["Territorial", "Nombre", "Correo", "Teléfono", "Cargo", "Dirección"]
+                            
+                            import urllib.parse
+                            import re
+                            
+                            def gen_wa_prof(tel):
+                                tel_str = str(tel).strip()
+                                if not tel_str or tel_str in ["", "nan", "None"]: return None
+                                digits = re.sub(r'\D', '', tel_str)
+                                if not digits: return None
+                                if not digits.startswith("57"): digits = "57" + digits
+                                return f"https://wa.me/{digits}"
+                                
+                            def gen_email_prof(correo, nombre):
+                                c_str = str(correo).strip()
+                                if "@" not in c_str: return None
+                                asunto = "Contacto desde Portafolio SPAE - Directorio de Profesionales"
+                                cuerpo = (
+                                    f"Cordial saludo {nombre},\n\n"
+                                    "Me comunico con usted para tratar temas de articulación y seguimiento "
+                                    "relacionados con los proyectos SPAE de su departamento.\n\n"
+                                    "[Escriba su mensaje aquí...]\n\n"
+                                    "Quedo atento(a).\n\n"
+                                    "Profesional SPAE"
+                                )
+                                return f"https://mail.google.com/mail/?view=cm&fs=1&to={c_str}&su={urllib.parse.quote(asunto)}&body={urllib.parse.quote(cuerpo)}"
+    
+                            if "Teléfono" in df_dir_prof.columns:
+                                df_dir_prof["Contactar (WhatsApp)"] = df_dir_prof["Teléfono"].apply(gen_wa_prof)
+                            if "Correo" in df_dir_prof.columns and "Nombre" in df_dir_prof.columns:
+                                df_dir_prof["Enviar Email (Gmail)"] = df_dir_prof.apply(lambda r: gen_email_prof(r.get("Correo"), r.get("Nombre", "")), axis=1)
+                            
+                            col_cfg_prof = {
+                                "Contactar (WhatsApp)": st.column_config.LinkColumn("Contactar (WhatsApp)", display_text="Abrir Chat WA"),
+                                "Enviar Email (Gmail)": st.column_config.LinkColumn("Enviar Email (Gmail)", display_text="Abrir Gmail")
+                            }
+                            
+                            # Filtrar por los departamentos asignados al usuario / municipio seleccionado
+                            import unicodedata
+                            def normalize_text(text):
+                                if not isinstance(text, str): return ""
+                                return unicodedata.normalize('NFD', text).encode('ascii', 'ignore').decode('utf-8').lower().strip()
+                            
+                            try:
+                                if not df_muni.empty and "departamento" in df_muni.columns:
+                                    deptos_muni = [normalize_text(d) for d in df_muni["departamento"].dropna().unique()]
+                                    if deptos_muni:
+                                        def match_depto(territorial_val):
+                                            t_norm = normalize_text(territorial_val)
+                                            for d in deptos_muni:
+                                                if d in t_norm: return True
+                                            return False
+                                        df_dir_prof = df_dir_prof[df_dir_prof["Territorial"].apply(match_depto)]
+                                        if df_dir_prof.empty:
+                                            st.warning("No se encontraron profesionales en el directorio para tus departamentos asignados.")
+                            except Exception as e:
+                                pass # Fallback a mostrar todos si hay error en el filtrado
+                            
+                            st.dataframe(df_dir_prof, use_container_width=True, hide_index=True, column_config=col_cfg_prof)
+                        else:
+                            st.info("Aún no has subido el Directorio de Profesionales a la nube.")
+                    else:
+                        st.error("Error consultando la base de datos.")
             else:
                 st.warning("Debes iniciar sesión para ver el directorio.")
         except Exception as e:
