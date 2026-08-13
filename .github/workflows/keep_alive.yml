@@ -1,8 +1,7 @@
-name: Ping Streamlit App
+ï»¿name: Ping Streamlit App
 
 on:
   schedule:
-    # Ejecutar todos los días a las 12:00 UTC (mañana en Colombia)
     - cron: '0 12 * * *'
   workflow_dispatch:
 
@@ -10,5 +9,11 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping SPAE Standalone
-        run: curl -sL https://spae-standalone-afywudedgwmqxj4qgb3qvn.streamlit.app/ > /dev/null
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Ping SPAE Standalone (Health Endpoint)
+        run: curl -sL https://spae-standalone-afywudedgwmqxj4qgb3qvn.streamlit.app/_stcore/health > /dev/null
+
+      - name: Keep GitHub Action Alive
+        uses: gautamkrishnar/keepalive-workflow@v1
