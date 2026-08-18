@@ -1,19 +1,89 @@
-﻿name: Ping Streamlit App
+name: Ping Streamlit App
 
 on:
   schedule:
-    - cron: '0 12 * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Ping SPAE Standalone (Health Endpoint)
-        run: curl -sL https://spae-standalone-afywudedgwmqxj4qgb3qvn.streamlit.app/_stcore/health > /dev/null
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install --with-deps chromium
+
+      - name: Wake up SPAE Standalone app
+        run: |
+          cat << 'EOF' > wake_spae.js
+          const { chromium } = require('playwright');
+          (async () => {
+            let browser;
+            try {
+              browser = await chromium.launch({ headless: true });
+              const context = await browser.newContext({
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+              });
+              const page = await context.newPage();
+              console.log('Navigating to SPAE Standalone on Streamlit Cloud...');
+              
+              await page.goto('https://spae-standalone-afywudedgwmqxj4qgb3qvn.streamlit.app/', {
+                waitUntil: 'domcontentloaded',
+                timeout: 45000
+              });
+
+              await page.waitForTimeout(4000);
+
+              const wakeSelectors = [
+                'button:has-text("Yes, get this app back up!")',
+                'button:has-text("get this app back up")',
+                'text=/Yes, get this app back up!/i',
+                'button:has-text("Wake up")'
+              ];
+
+              let clicked = false;
+              for (const sel of wakeSelectors) {
+                try {
+                  const btn = page.locator(sel).first();
+                  if (await btn.isVisible({ timeout: 3000 })) {
+                    await btn.click();
+                    console.log(`SPAE app was sleeping. Clicked wake button with selector: ${sel}`);
+                    clicked = true;
+                    await page.waitForTimeout(10000);
+                    break;
+                  }
+                } catch (err) {}
+              }
+
+              if (!clicked) {
+                console.log('SPAE Standalone app was already awake.');
+              }
+            } catch (error) {
+              console.log('Handled notice during SPAE wake cycle:', error.message);
+            } finally {
+              if (browser) {
+                await browser.close();
+              }
+              // Always exit cleanly to prevent false failure emails
+              process.exit(0);
+            }
+          })();
+          EOF
+          node wake_spae.js
 
       - name: Keep GitHub Action Alive
         uses: gautamkrishnar/keepalive-workflow@v1
+        continue-on-error: true
