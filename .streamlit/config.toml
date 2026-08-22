@@ -1,0 +1,20 @@
+[theme]
+base = "light"
+primaryColor = "#003366"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F4F8"
+textColor = "#1E293B"
+
+[server]
+headless = true
+address = "0.0.0.0"
+port = 8505
+enableStaticServing = true
+enableCORS = false
+enableXsrfProtection = false
+maxUploadSize = 500
+maxMessageSize = 500
+fileWatcherType = "none"
+
+[browser]
+gatherUsageStats = false

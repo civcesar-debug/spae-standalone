@@ -187,18 +187,44 @@ user_email = getattr(user, "email", "").lower()
 # 1. FUNCIONES DE SUPABASE Y LOCALES
 import json
 
+IS_SUPABASE_CONFIGURED = bool(
+    SUPABASE_URL
+    and SUPABASE_KEY
+    and str(SUPABASE_URL).startswith("http")
+    and "aqui_va_tu_url" not in str(SUPABASE_URL)
+)
+
 def get_local_history():
-    hist_path = r"C:\Users\cagch\Desktop\senador\upv2026\junio\historial_cambios.json"
-    if not os.path.exists(hist_path): return pd.DataFrame()
-    try:
-        with open(hist_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            if data: return pd.DataFrame(data)
-    except Exception: pass
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(base_dir, "data")
+    hist_path = os.path.join(data_dir, "historial_cambios.json")
+    if IS_SUPABASE_CONFIGURED:
+        try:
+            url = f"{SUPABASE_URL}/rest/v1/spae_portafolio_revisiones?select=*&order=fecha_hora_revision.desc&limit=30"
+            headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+            res = requests.get(url, headers=headers, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                if data:
+                    df_h = pd.DataFrame(data)
+                    if "fecha_hora_revision" in df_h.columns: df_h.rename(columns={"fecha_hora_revision": "Fecha"}, inplace=True)
+                    if "revisado_por" in df_h.columns: df_h.rename(columns={"revisado_por": "Usuario"}, inplace=True)
+                    if "detalle_cambios" in df_h.columns: df_h.rename(columns={"detalle_cambios": "Resumen de Cambios"}, inplace=True)
+                    return df_h
+        except Exception: pass
+    if os.path.exists(hist_path):
+        try:
+            with open(hist_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if data: return pd.DataFrame(data)
+        except Exception: pass
     return pd.DataFrame()
 
 def save_local_history(resumen, usuario):
-    hist_path = r"C:\Users\cagch\Desktop\senador\upv2026\junio\historial_cambios.json"
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(base_dir, "data")
+    if not os.path.exists(data_dir): os.makedirs(data_dir, exist_ok=True)
+    hist_path = os.path.join(data_dir, "historial_cambios.json")
     nuevo_registro = {
         "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "Usuario": usuario,
@@ -216,61 +242,55 @@ def save_local_history(resumen, usuario):
     except Exception: pass
 
 def get_all_proyectos():
-    user = st.session_state.get("auth_user")
-    if not user or not SUPABASE_URL or not SUPABASE_KEY: return pd.DataFrame()
-    
-    headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {getattr(user, 'access_token', SUPABASE_KEY)}"}
-    
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(base_dir, "data")
+    local_snap = os.path.join(data_dir, "spae_snapshot_last.json")
     df_result = pd.DataFrame()
-    
-    # 1. Intentar cargar spae_snapshot_actual
-    try:
-        url = f"{SUPABASE_URL}/rest/v1/proyectos?nombre_proyecto=eq.spae_snapshot_actual&select=estado_json&order=created_at.desc&limit=1"
-        res = requests.get(url, headers=headers)
-        if res.status_code == 200:
-            data = res.json()
-            if data and len(data) > 0:
-                estado = data[0].get("estado_json", "[]")
-                if isinstance(estado, str): estado = json.loads(estado)
-                df_result = pd.DataFrame(estado)
-    except Exception: pass
-
-    # 2. Fallback a SPAE_GLOBAL_DB
-    if df_result.empty:
+    if IS_SUPABASE_CONFIGURED:
         try:
-            url = f"{SUPABASE_URL}/rest/v1/proyectos?nombre_proyecto=eq.SPAE_GLOBAL_DB&select=estado_json&order=created_at.desc&limit=1"
-            res = requests.get(url, headers=headers)
+            headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+            url = f"{SUPABASE_URL}/rest/v1/proyectos?nombre_proyecto=eq.spae_snapshot_actual&select=estado_json&order=created_at.desc&limit=1"
+            res = requests.get(url, headers=headers, timeout=8)
             if res.status_code == 200:
                 data = res.json()
                 if data and len(data) > 0:
                     estado = data[0].get("estado_json", "[]")
                     if isinstance(estado, str): estado = json.loads(estado)
                     df_result = pd.DataFrame(estado)
-        except Exception: pass
-    
-    # 3. Fallback a archivos locales
-    if df_result.empty:
+                    if not df_result.empty:
+                        if not os.path.exists(data_dir): os.makedirs(data_dir, exist_ok=True)
+                        with open(local_snap, "w", encoding="utf-8") as f:
+                            json.dump(estado, f, indent=2, ensure_ascii=False)
+                        print("[APP] Cargado exitosamente desde Supabase!")
+                        return df_result
+        except Exception as e_sup:
+            print(f"[APP] Error obteniendo de Supabase: {e_sup}")
+    if os.path.exists(local_snap):
         try:
-            import glob
-            import os
-            versiones_dir = r"C:\Users\cagch\Desktop\senador\upv2026\junio\Versiones_Anteriores"
-            archivos = glob.glob(os.path.join(versiones_dir, "Portafolio_SPAE_Revision_*.xlsx"))
-            if archivos:
-                archivos.sort(key=os.path.getmtime, reverse=True)
-                ultimo_archivo = archivos[0]
-                df_result = leer_portafolio_nuevo(ultimo_archivo)
-        except Exception: pass
-        
-    # Siempre cruzar con el directorio más reciente (para inyectar los contactos que hayan sido actualizados localmente)
-    if not df_result.empty:
-        df_dir = leer_directorio_maestro()
-        if not df_dir.empty:
-            df_result = cruzar_con_directorio(df_result, df_dir)
-        return df_result
-    
+            with open(local_snap, "r", encoding="utf-8") as f:
+                estado_loc = json.load(f)
+                if estado_loc:
+                    print("[APP] Cargado exitosamente desde spae_snapshot_last.json local!")
+                    return pd.DataFrame(estado_loc)
+        except Exception as e_json:
+            print(f"[APP] Error cargando JSON local: {e_json}")
+    try:
+        import glob
+        versiones_dirs = [
+            os.path.join(base_dir, "Versiones_Anteriores"),
+            os.path.join(base_dir, "Julio", "27072026")
+        ]
+        for vdir in versiones_dirs:
+            if os.path.exists(vdir):
+                archivos = glob.glob(os.path.join(vdir, "*.xlsx"))
+                if archivos:
+                    ultimo_excel = max(archivos, key=os.path.getmtime)
+                    print(f"[APP] Cargando desde ultimo Excel encontrado: {ultimo_excel}")
+                    return leer_portafolio_nuevo(ultimo_excel)
+    except Exception as e_exc:
+        print(f"[APP] Error cargando Excel de respaldo: {e_exc}")
     return pd.DataFrame()
 
-# LECTURA DIRECTORIO MAESTRO
 def leer_directorio_maestro() -> pd.DataFrame:
     ruta_dir = r"C:\Users\cagch\Desktop\senador\upv2026\junio\Matriz_Seguimiento_Proyectos_Cesar.xlsx"
     if not os.path.exists(ruta_dir): return pd.DataFrame()
@@ -356,10 +376,10 @@ def leer_portafolio_nuevo(archivo) -> pd.DataFrame:
     ]
     
     # Renombrar estáticamente los índices para F-2 y F-3
-    if len(df.columns) > 67:
+    if "anexo_agro_0" not in df.columns and len(df.columns) > 67:
         map_f2 = {df.columns[i]: f"anexo_agro_{i-55}" for i in range(55, 68)}
         df.rename(columns=map_f2, inplace=True)
-    if len(df.columns) > 73:
+    if "anexo_dmec_0" not in df.columns and len(df.columns) > 73:
         map_f3 = {df.columns[i]: f"anexo_dmec_{i-68}" for i in range(68, 74)}
         df.rename(columns=map_f3, inplace=True)
         
